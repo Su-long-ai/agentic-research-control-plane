@@ -64,8 +64,9 @@ PROMOTABLE only if:
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 
-set PYTHONPATH=src
+pip install -e ".[dev]"
 python -m unittest discover -s tests -v
+ruff check src tests
 python -m research_control_plane.demo
 ```
 
