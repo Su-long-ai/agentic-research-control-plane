@@ -151,6 +151,33 @@ class ResearchControlPlane:
         self.store.write(f"experiments/{experiment_id}/audit.json", payload)
         return payload
 
+    def export_manifest(self, experiment_id: str, output_path: Path | None = None) -> dict:
+        """Build a compact, independently checkable manifest of the promotion chain."""
+        records = {}
+        for name in ("freeze", "result", "audit"):
+            relative = f"experiments/{experiment_id}/{name}.json"
+            if self.store.exists(relative):
+                path = self.store.root / relative
+                records[name] = {
+                    "path": relative,
+                    "sha256": sha256_file(path),
+                }
+
+        manifest = {
+            "experiment_id": experiment_id,
+            "generated_at": self._now(),
+            "state_records": records,
+            "promotion": self.promotion_status(experiment_id),
+        }
+        if output_path is not None:
+            out = Path(output_path)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(
+                __import__("json").dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        return manifest
+
     def promotion_status(self, experiment_id: str) -> dict:
         reasons = []
         if not self.store.exists(f"experiments/{experiment_id}/freeze.json"):

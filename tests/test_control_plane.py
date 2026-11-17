@@ -88,6 +88,20 @@ class ControlPlaneTests(unittest.TestCase):
         self.assertFalse(status["promotable"])
         self.assertIn("RESULT_DRIFT", status["reasons"])
 
+    def test_export_manifest_binds_control_records(self):
+        self.prepare_ready_candidate()
+        self.cp.freeze_experiment("e1", "c1", self.formal_artifacts())
+        result = self.f("result.json", '{"value":1}')
+        audit = self.f("audit.json", json.dumps({"verdict": "PASS"}))
+        self.cp.bind_result("e1", result)
+        self.cp.bind_audit("e1", audit)
+        out = self.root / "promotion_manifest.json"
+        manifest = self.cp.export_manifest("e1", out)
+        self.assertTrue(out.exists())
+        self.assertTrue(manifest["promotion"]["promotable"])
+        self.assertEqual(set(manifest["state_records"]), {"freeze", "result", "audit"})
+        self.assertTrue(all(len(v["sha256"]) == 64 for v in manifest["state_records"].values()))
+
 
 if __name__ == "__main__":
     unittest.main()

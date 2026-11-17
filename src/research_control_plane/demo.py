@@ -42,6 +42,7 @@ def main() -> None:
     cp.bind_result("exp-001", result)
     cp.bind_audit("exp-001", audit)
     print(cp.promotion_status("exp-001"))
+    cp.export_manifest("exp-001", root / "promotion_manifest.json")
 
 
 if __name__ == "__main__":
