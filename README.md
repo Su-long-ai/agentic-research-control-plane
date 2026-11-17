@@ -55,6 +55,7 @@ PROMOTABLE only if:
 - atomic JSON state persistence
 - negative paths covered by unit tests
 - exportable promotion manifest that SHA-binds freeze/result/audit control records
+- validated candidate/experiment IDs before they become state paths
 - domain-agnostic design
 
 ## Quick start
@@ -68,7 +69,7 @@ python -m unittest discover -s tests -v
 python -m research_control_plane.demo
 ```
 
-The public suite currently covers **7 promotion/control paths**, including non-READY candidates, candidate drift, frozen-protocol drift, result drift, audit FAIL, successful promotion, and manifest export.
+The public suite currently covers **8 promotion/control paths**, including non-READY candidates, candidate drift, frozen-protocol drift, result drift, audit FAIL, successful promotion, and manifest export.
 
 ## Minimal API
 
@@ -123,6 +124,8 @@ If any frozen artifact changes after freeze, promotion is denied until a new exp
 ### Export a verification manifest
 
 After result + audit binding, `export_manifest()` produces a compact JSON record containing SHA-256 hashes for the freeze/result/audit control records plus the current promotion verdict. This makes the promotion chain easy to archive or independently re-check.
+
+For the invariants, failure modes and trade-offs behind the promotion chain, see [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## What this repository does not claim
 

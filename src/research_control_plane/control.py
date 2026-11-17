@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 from typing import Mapping
 
 from .hashing import sha256_file
@@ -10,6 +11,7 @@ from .store import JsonStore
 
 class ResearchControlPlane:
     ALLOWED_DECISIONS = {"READY", "REJECT", "EVIDENCE_ONLY"}
+    _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
     def __init__(self, root: Path):
         self.store = JsonStore(root)
@@ -17,6 +19,12 @@ class ResearchControlPlane:
     @staticmethod
     def _now() -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    @classmethod
+    def _validate_id(cls, value: str, field: str) -> str:
+        if not cls._SAFE_ID.fullmatch(value):
+            raise ValueError(f"unsafe {field}: {value!r}")
+        return value
 
     @staticmethod
     def _bind(paths: Mapping[str, Path]) -> dict[str, dict[str, str]]:
@@ -34,8 +42,7 @@ class ResearchControlPlane:
         artifact_paths: Mapping[str, Path],
         summary: str,
     ) -> dict:
-        if not candidate_id.strip():
-            raise ValueError("candidate_id must not be empty")
+        self._validate_id(candidate_id, "candidate_id")
         if not artifact_paths:
             raise ValueError("candidate must bind at least one artifact")
         payload = {
@@ -48,6 +55,7 @@ class ResearchControlPlane:
         return payload
 
     def verify_candidate(self, candidate_id: str) -> bool:
+        self._validate_id(candidate_id, "candidate_id")
         data = self.store.read(f"candidates/{candidate_id}/submission.json")
         return self._verify_bound(data["artifacts"])
 
@@ -57,6 +65,7 @@ class ResearchControlPlane:
         decision: str,
         rationale: str,
     ) -> dict:
+        self._validate_id(candidate_id, "candidate_id")
         decision = decision.upper()
         if decision not in self.ALLOWED_DECISIONS:
             raise ValueError(f"unsupported decision: {decision}")
@@ -77,6 +86,8 @@ class ResearchControlPlane:
         candidate_id: str,
         artifacts: Mapping[str, Path],
     ) -> dict:
+        self._validate_id(experiment_id, "experiment_id")
+        self._validate_id(candidate_id, "candidate_id")
         decision = self.store.read(f"candidates/{candidate_id}/lead_decision.json")
         if decision["decision"] != "READY":
             raise RuntimeError("formal experiment requires Lead READY")
@@ -109,12 +120,14 @@ class ResearchControlPlane:
         return True
 
     def verify_frozen(self, experiment_id: str) -> bool:
+        self._validate_id(experiment_id, "experiment_id")
         freeze = self.store.read(f"experiments/{experiment_id}/freeze.json")
         return self._verify_bound(freeze["candidate_artifacts"]) and self._verify_bound(
             freeze["formal_artifacts"]
         )
 
     def bind_result(self, experiment_id: str, result_path: Path) -> dict:
+        self._validate_id(experiment_id, "experiment_id")
         if not self.verify_frozen(experiment_id):
             raise RuntimeError("frozen artifacts drifted before result binding")
         p = Path(result_path).resolve()
@@ -127,6 +140,7 @@ class ResearchControlPlane:
         return payload
 
     def bind_audit(self, experiment_id: str, audit_report_path: Path) -> dict:
+        self._validate_id(experiment_id, "experiment_id")
         if not self.verify_frozen(experiment_id):
             raise RuntimeError("frozen artifacts drifted before audit binding")
         if not self.store.exists(f"experiments/{experiment_id}/result.json"):
@@ -153,6 +167,7 @@ class ResearchControlPlane:
 
     def export_manifest(self, experiment_id: str, output_path: Path | None = None) -> dict:
         """Build a compact, independently checkable manifest of the promotion chain."""
+        self._validate_id(experiment_id, "experiment_id")
         records = {}
         for name in ("freeze", "result", "audit"):
             relative = f"experiments/{experiment_id}/{name}.json"
@@ -179,6 +194,7 @@ class ResearchControlPlane:
         return manifest
 
     def promotion_status(self, experiment_id: str) -> dict:
+        self._validate_id(experiment_id, "experiment_id")
         reasons = []
         if not self.store.exists(f"experiments/{experiment_id}/freeze.json"):
             reasons.append("NO_FREEZE")

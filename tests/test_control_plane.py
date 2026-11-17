@@ -88,6 +88,16 @@ class ControlPlaneTests(unittest.TestCase):
         self.assertFalse(status["promotable"])
         self.assertIn("RESULT_DRIFT", status["reasons"])
 
+    def test_unsafe_candidate_and_experiment_ids_are_rejected(self):
+        artifact = self.f("candidate.py", "print('ok')")
+        with self.assertRaisesRegex(ValueError, "unsafe candidate_id"):
+            self.cp.submit_candidate("../escape", {"implementation": artifact}, "candidate")
+
+        self.cp.submit_candidate("c1", {"implementation": artifact}, "candidate")
+        self.cp.record_lead_decision("c1", "READY", "bounded test")
+        with self.assertRaisesRegex(ValueError, "unsafe experiment_id"):
+            self.cp.freeze_experiment("../escape", "c1", self.formal_artifacts())
+
     def test_export_manifest_binds_control_records(self):
         self.prepare_ready_candidate()
         self.cp.freeze_experiment("e1", "c1", self.formal_artifacts())
